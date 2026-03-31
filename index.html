@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Google Workspace with Gemini - Prompting Guide 101</title>
+  
+  <!-- 載入 Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- 載入 React, ReactDOM 與 Babel 以在瀏覽器中直接執行 JSX -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+    /* 平滑滾動 */
+    html { scroll-behavior: smooth; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    // --- 圖示元件 (取代 lucide-react，確保單檔完美運行) ---
+    const Icon = ({ children, className = "w-6 h-6" }) => (
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        {children}
+      </svg>
+    );
+
+    const Sparkles = ({ className }) => <Icon className={className}><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></Icon>;
+    const ArrowRight = ({ className }) => <Icon className={className}><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></Icon>;
+    const Zap = ({ className }) => <Icon className={className}><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14H4z"/></Icon>;
+    const Lightbulb = ({ className }) => <Icon className={className}><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1.3.5 2.6 1.5 3.5.8.8 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></Icon>;
+    const ShieldCheck = ({ className }) => <Icon className={className}><path d="M20 13c0 5-3.5 9-8 10-4.5-1-8-5-8-10V5l8-3 8 3v8Z"/><path d="m9 12 2 2 4-4"/></Icon>;
+    const ChevronLeft = ({ className }) => <Icon className={className}><path d="m15 18-6-6 6-6"/></Icon>;
+    const Target = ({ className }) => <Icon className={className}><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></Icon>;
+    const CheckCircle2 = ({ className }) => <Icon className={className}><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="m9 12 2 2 4-4"/></Icon>;
+    const AlignLeft = ({ className }) => <Icon className={className}><line x1="21" x2="3" y1="6" y2="6"/><line x1="15" x2="3" y1="12" y2="12"/><line x1="17" x2="3" y1="18" y2="18"/></Icon>;
+    const Terminal = ({ className }) => <Icon className={className}><polyline points="4 17 10 11 4 5"/><line x1="12" x2="20" y1="19" y2="19"/></Icon>;
+    const Layers = ({ className }) => <Icon className={className}><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></Icon>;
+    const MessageSquare = ({ className }) => <Icon className={className}><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></Icon>;
+    const Mail = ({ className }) => <Icon className={className}><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></Icon>;
+    const Table = ({ className }) => <Icon className={className}><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><line x1="3" x2="21" y1="9" y2="9"/><line x1="3" x2="21" y1="15" y2="15"/><line x1="9" x2="9" y1="9" y2="21"/><line x1="15" x2="15" y1="9" y2="21"/></Icon>;
+    const FileText = ({ className }) => <Icon className={className}><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></Icon>;
+    const Presentation = ({ className }) => <Icon className={className}><path d="M2 3h20"/><path d="M21 3v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V3"/><path d="m7 21 5-5 5 5"/></Icon>;
+    const Copy = ({ className }) => <Icon className={className}><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></Icon>;
+
+    // --- Data ---
+    const teachingData = {
+      elements: [
+        { title: '角色 (Persona)', desc: '指定 Gemini 扮演的專業角色，例如：「你是一位產品行銷經理...」' },
+        { title: '任務 (Task)', desc: '明確指示要做什麼，請務必包含動詞，例如：「撰寫一封執行摘要電子郵件...」' },
+        { title: '背景 (Context)', desc: '提供相關資訊與細節，例如：「根據我們最新的專案文件內容...」' },
+        { title: '格式 (Format)', desc: '指定輸出的樣式，例如：「請限制在三個條列式重點...」' }
+      ],
+      tips: [
+        { title: '1. 使用自然語言', desc: '像和真人說話一樣，使用完整的句子表達完整的想法。' },
+        { title: '2. 具體並迭代', desc: '明確告知需求（總結、撰寫、改變語氣等），給予指示並設定限制條件。' },
+        { title: '3. 簡明扼要', desc: '需求要簡短但具體，避免使用過度複雜的行話或術語。' },
+        { title: '4. 當作對話', desc: '如果不滿意結果，可透過後續提示詞進行反覆微調與修正。' },
+        { title: '5. 使用您的文件', desc: '在提示詞中使用 "@檔案名稱" 引用 Google Drive 中的文件來個人化輸出。' },
+        { title: '6. 善用內建建議', desc: '使用 Gemini 提供的上下文建議動作，例如「顯示更長的摘要」或「列出待辦事項」。' }
+      ],
+      levelUp: [
+        { title: '拆解任務', desc: '如果是複雜專案，請將其拆分為多個獨立的提示詞逐步進行。' },
+        { title: '給予限制', desc: '設定字數限制或選項數量等邊界條件，讓結果更聚焦。' },
+        { title: '要求回饋', desc: '在提示詞尾端加上：「你需要我提供什麼資訊，才能產出最好的結果？」' },
+        { title: '調整語氣', desc: '要求輸出特定語氣，如：正式、非正式、技術性、創意或休閒。' }
+      ]
+    };
+
+    const scenarios = [
+      // Administrative Support
+      { id: 1, role: '行政支援', icon: MessageSquare, tool: 'Gemini app', useCase: '規劃三天異地會議議程', prompt: 'I am an executive administrator to a team director. Our newly formed team now consists of content marketers, digital marketers, and product marketers. We are gathering for the first time at a three-day offsite in Washington, DC. Plan activities for each day that include team bonding activities and time for deeper strategic work. Create a sample agenda for me.' },
+      { id: 2, role: '行政支援', icon: Mail, tool: 'Gemini in Gmail', useCase: '休假後總結收件匣', prompt: 'Summarize emails from [manager] from the last week. Summarize this email thread and list all action items and deadlines.' },
+      { id: 3, role: '行政支援', icon: Table, tool: 'Gemini in Sheets', useCase: '建立商務差旅預算追蹤表', prompt: 'Create a budget tracker for business travel. It should include columns for: date, expense type (meal, entertainment, transportation), vendor name, and a description.' },
+      
+      // Communications
+      { id: 4, role: '通訊公關', icon: FileText, tool: 'Gemini in Docs', useCase: '撰寫企業收購新聞稿', prompt: 'I\'m a PR manager. I need to create a press release with a catchy title. Include quotes from @[VIP Quotes Acquisition]. Use @[Biography and Mission Statement] to add more information about the company that is being acquired, its mission, and how it got started.' },
+      { id: 5, role: '通訊公關', icon: Presentation, tool: 'Gemini in Slides', useCase: '媒體簡報投影片製作', prompt: 'Create a slide describing what [product] is from @[Product Launch - Notes]. Make sure it is short and easily understood by a broad audience.' },
+      { id: 6, role: '通訊公關', icon: MessageSquare, tool: 'Gemini app', useCase: '準備發言人模擬面試問題', prompt: 'I am a PR manager at [company name]. We just launched [product]. I am preparing [spokesperson] for interviews. Generate a list of mock interview questions... Include a mixture of easy and hard questions.' },
+
+      // Customer Service
+      { id: 7, role: '客戶服務', icon: FileText, tool: 'Gemini in Docs', useCase: '撰寫具同理心的客訴回信', prompt: 'Help me craft an empathetic email response. I am a customer service rep... The customer ordered headphones that arrived damaged. I\'ve offered a replacement, but they want expedited shipping. Include a paragraph acknowledging frustration and 3 bullet points with alternative resolutions.' },
+      { id: 8, role: '客戶服務', icon: FileText, tool: 'Gemini in Docs', useCase: '將退貨政策簡化為自助文章', prompt: 'Summarize this content to write a clear and concise product return policy and outline 5 steps for customers to take in sequential order.' },
+      { id: 9, role: '客戶服務', icon: Table, tool: 'Gemini in Sheets', useCase: '建立客戶體驗改善追蹤表', prompt: 'Create a table to track the progress and impact of different customer experience improvement tactics using relevant metrics, including support ticket volume and priority level (high, medium, low).' },
+
+      // Executives
+      { id: 10, role: '高階主管', icon: Mail, tool: 'Gemini in Gmail', useCase: '高階主管旅途中快速回信', prompt: 'Draft an email confirming that I will be at the board meeting. Ask if we can adjust the agenda to give 15 minutes to [urgent topics].' },
+      { id: 11, role: '高階主管', icon: MessageSquare, tool: 'Gemini app', useCase: 'CMO 進行競爭對手分析', prompt: 'I am a CMO conducting a competitive analysis. My company is considering expanding into [a new line of business]. Generate a list of the top five competitors in the [industry] industry and include their pricing, strengths, weaknesses, and target audience.' },
+      { id: 12, role: '高階主管', icon: MessageSquare, tool: 'Gemini app', useCase: 'CTO 總結新興技術趨勢', prompt: 'I am the CTO of [company] in [industry]. Summarize the top five emerging technologies with the most significant potential impact on [industry] in the next two to three years.' },
+
+      // Frontline Management
+      { id: 13, role: '前線管理', icon: Layers, tool: 'Gemini in Drive', useCase: '在雲端硬碟快速尋找政策文件', prompt: 'Find the document that details the [company name]\'s [holiday] sale details. / Find the document that discusses our new return and exchange policies.' },
+      { id: 14, role: '前線管理', icon: Table, tool: 'Gemini in Sheets', useCase: '建立門市開班/打烊任務清單', prompt: 'I am a retail manager and I need to create a checklist for my opening and closing duties. Create a template with columns for [opening and closing duties] from @[Onboarding New Hire Information].' },
+      { id: 15, role: '前線管理', icon: FileText, tool: 'Gemini in Docs', useCase: '現場技術人員建立維修紀錄', prompt: '(Using Voice-to-Text) Formalize these notes into a concise repair summary that includes the problem, the solution, and parts used.' },
+
+      // Human Resources
+      { id: 16, role: '人力資源', icon: FileText, tool: 'Gemini in Docs', useCase: '起草新進員工歡迎/培訓簡報講稿', prompt: 'I am an HR manager. Help me draft talking points that showcase why employee mentorship and development are core values for our company using @[Mission Statement and Core Values].' },
+      { id: 17, role: '人力資源', icon: FileText, tool: 'Gemini in Docs', useCase: '撰寫具吸引力的職缺描述 (JD)', prompt: 'I am opening a new job position on the marketing team. Write a compelling role description for a content marketing manager. Highlight key responsibilities and requirements, including B2B and B2C content creation, 5 years experience.' },
+      { id: 18, role: '人力資源', icon: MessageSquare, tool: 'Gemini app', useCase: '清理與分析員工滿意度調查資料', prompt: 'Help me clean my employee survey spreadsheet. Fill blank values in the name column with "Anonymous", replace "Headquarters" with "HQ", and remove rows where satisfaction is blank. Generate a new file.' },
+
+      // Marketing
+      { id: 19, role: '行銷企劃', icon: MessageSquare, tool: 'Gemini app', useCase: '發想全新視覺識別與品牌 Logo', prompt: 'Generate ideas for a creative and eye-catching logo for my new business, a coffee shop combined with a video game cafe. Appeal to gamers and coffee lovers. Give options in Modern/Playful, Retro-Cool, and Minimalist styles.' },
+      { id: 20, role: '行銷企劃', icon: MessageSquare, tool: 'Gemini app', useCase: '撰寫與優化 SEM 廣告文案', prompt: 'I am a digital marketing manager. I am working on SEM ads for [product]. Here are my seed keywords: [list]. Generate additional long-tail keywords. Then generate multiple ad copy variations with different headlines and CTAs.' },
+      { id: 21, role: '行銷企劃', icon: Presentation, tool: 'Gemini in Slides', useCase: '為廣告活動建立靈感視覺圖', prompt: 'Help me create inspirational images for a marketing campaign for [type of product]. Images should use [colors] and [natural elements, such as clouds]. Use a photorealistic style.' },
+
+      // Project Management
+      { id: 22, role: '專案管理', icon: MessageSquare, tool: 'Gemini app', useCase: '生成系統使用者驗收測試 (UAT)', prompt: 'Create a table with 10 user acceptance tests (UAT) for the website registration form. Then draft an email to my colleague running this UAT explaining what to do next.' },
+      { id: 23, role: '專案管理', icon: FileText, tool: 'Gemini in Docs', useCase: '撰寫專案回顧 (Retrospective) 問題', prompt: 'I need to write a report detailing the successes, failures, and lessons learned from [project]. Draft a list of 20 questions to guide a cross-team process investigation to uncover what worked and communication gaps.' },
+      { id: 24, role: '專案管理', icon: Table, tool: 'Gemini in Sheets', useCase: '建立專案風險與問題追蹤表', prompt: 'Create a spreadsheet to track project issues, including descriptions, status, assigned owner, and action items for resolution.' },
+
+      // Sales
+      { id: 25, role: '業務銷售', icon: Mail, tool: 'Gemini in Gmail', useCase: '向新客戶聯絡人發送破冰介紹信', prompt: 'Write an email to [name], the new [title] at [company]. Congratulate them on their new role. Introduce me as their contact point at [company name]. Invite them to lunch next week and check if they prefer Monday or Tuesday.' },
+      { id: 26, role: '業務銷售', icon: MessageSquare, tool: 'Gemini app', useCase: '客戶會議前生成反對意見處理腳本', prompt: 'I have an upcoming call with a prospect. List the most likely objections [customer] might have for me during a sales call, with suggestions on how to respond. I work in [industry] selling [product].' },
+      { id: 27, role: '業務銷售', icon: FileText, tool: 'Gemini in Docs', useCase: '客製化痛點解決提案', prompt: 'I am an account manager. Summarize the pain points mentioned by [customer] during our last meeting using @[Customer Call Transcript]. Then write specific reasons why [product] could help them using @[Product Sales Kit].' },
+    ];
+
+    const roles = ['全部', ...new Set(scenarios.map(s => s.role))];
+
+    // --- Main App Component ---
+    function App() {
+      const [currentView, setCurrentView] = useState('home'); // 'home' or 'guide'
+      const [activeRole, setActiveRole] = useState('全部');
+      const [copiedId, setCopiedId] = useState(null);
+
+      // Scroll to top when view changes
+      useEffect(() => {
+        window.scrollTo(0, 0);
+      }, [currentView]);
+
+      const filteredScenarios = activeRole === '全部' 
+        ? scenarios 
+        : scenarios.filter(s => s.role === activeRole);
+
+      const handleCopy = (text, id) => {
+        // Fallback for document.execCommand if navigator.clipboard is blocked (like in some iframes)
+        if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(text);
+        } else {
+            const textArea = document.createElement("textarea");
+            textArea.value = text;
+            textArea.style.position = "fixed";
+            textArea.style.left = "-999999px";
+            textArea.style.top = "-999999px";
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            try {
+                document.execCommand('copy');
+            } catch (error) {
+                console.error('Failed to copy text', error);
+            }
+            textArea.remove();
+        }
+        
+        setCopiedId(id);
+        setTimeout(() => setCopiedId(null), 2000);
+      };
+
+      // --- Home View Component ---
+      const HomeView = () => (
+        <div className="min-h-screen bg-white font-sans text-gray-800">
+          {/* Hero Section */}
+          <section className="relative overflow-hidden bg-gradient-to-br from-blue-700 via-indigo-800 to-purple-900 text-white pt-24 pb-32 px-6">
+            <div className="absolute top-0 left-0 w-full h-full opacity-10 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-white to-transparent"></div>
+            <div className="max-w-5xl mx-auto relative z-10 text-center">
+              <div className="inline-flex items-center bg-white/10 backdrop-blur-md border border-white/20 rounded-full px-4 py-1.5 mb-8">
+                <Sparkles className="w-4 h-4 text-amber-300 mr-2" />
+                <span className="text-sm font-medium text-blue-50">Helpful AI for All</span>
+              </div>
+              <h1 className="text-5xl md:text-7xl font-extrabold mb-6 tracking-tight">
+                Google Workspace <br/><span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-300 to-purple-300">with Gemini</span>
+              </h1>
+              <p className="text-xl md:text-2xl font-light max-w-3xl mx-auto opacity-90 mb-12 leading-relaxed">
+                這不是炒作，而是為您實際的工作流程量身打造的 AI 夥伴。從發想創意、撰寫文案到自動化專案，讓科技為您清除障礙，加速創新。
+              </p>
+              <button 
+                onClick={() => setCurrentView('guide')}
+                className="group inline-flex items-center justify-center bg-white text-indigo-700 font-bold text-lg px-8 py-4 rounded-full shadow-xl hover:bg-gray-50 hover:scale-105 transition-all duration-300"
+              >
+                開始探索提示詞指南
+                <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
+              </button>
+            </div>
+          </section>
+
+          {/* Features Section */}
+          <section className="py-24 px-6 bg-gray-50">
+            <div className="max-w-7xl mx-auto">
+              <div className="text-center mb-16">
+                <h2 className="text-3xl font-bold text-gray-900 mb-4">專為您打造的強大工具</h2>
+                <p className="text-lg text-gray-600 max-w-2xl mx-auto">在工作的新時代，Gemini 幫助您用全新的方式完成最出色的工作。</p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
+                <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+                  <div className="w-14 h-14 bg-blue-100 rounded-2xl flex items-center justify-center mb-6">
+                    <Zap className="w-7 h-7 text-blue-600" />
+                  </div>
+                  <h3 className="text-xl font-bold mb-3">無縫整合日常應用</h3>
+                  <p className="text-gray-600 leading-relaxed">
+                    直接在您熟悉的 Google Docs、Gmail、Sheets 和 Meet 中使用 Gemini，減少切換分頁，保持專注與高效率。
+                  </p>
+                </div>
+
+                <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+                  <div className="w-14 h-14 bg-purple-100 rounded-2xl flex items-center justify-center mb-6">
+                    <Lightbulb className="w-7 h-7 text-purple-600" />
+                  </div>
+                  <h3 className="text-xl font-bold mb-3">獨立且強大的 AI 夥伴</h3>
+                  <p className="text-gray-600 leading-relaxed">
+                    透過獨立的 Gemini app 進行深入研究，或使用 NotebookLM 和 Google Vids 等 AI 優先工具激發全新創意與觀點。
+                  </p>
+                </div>
+
+                <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+                  <div className="w-14 h-14 bg-green-100 rounded-2xl flex items-center justify-center mb-6">
+                    <ShieldCheck className="w-7 h-7 text-green-600" />
+                  </div>
+                  <h3 className="text-xl font-bold mb-3">企業級安全與隱私</h3>
+                  <p className="text-gray-600 leading-relaxed">
+                    您的資料完全屬於您。Gemini 不會使用您的私有文件或內容來訓練公共模型，且未經授權絕無人工審查，隱私受到嚴格保護。
+                  </p>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+      );
+
+      // --- Guide View Component ---
+      const GuideView = () => (
+        <div className="min-h-screen bg-gray-50 font-sans text-gray-800 pb-20">
+          {/* Sticky Top Nav */}
+          <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-200 px-4 py-3 shadow-sm">
+            <div className="max-w-7xl mx-auto flex items-center justify-between">
+              <button 
+                onClick={() => setCurrentView('home')}
+                className="flex items-center text-gray-600 hover:text-indigo-600 font-medium transition-colors"
+              >
+                <ChevronLeft className="w-5 h-5 mr-1" /> 回首頁
+              </button>
+              <span className="font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600 hidden sm:block">
+                Prompting Guide 101
+              </span>
+            </div>
+          </nav>
+
+          <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+            
+            {/* Section 1: Prompting 101 */}
+            <section className="mb-16">
+              <div className="flex items-center justify-center mb-10">
+                <Lightbulb className="w-8 h-8 text-amber-500 mr-3" />
+                <h2 className="text-3xl font-bold text-gray-900">提示詞教學 101 (Prompting Basics)</h2>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                {/* Elements */}
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow">
+                  <h3 className="text-xl font-bold mb-4 flex items-center text-blue-700">
+                    <Target className="w-5 h-5 mr-2" /> 提示詞四大要素
+                  </h3>
+                  <ul className="space-y-4">
+                    {teachingData.elements.map((el, idx) => (
+                      <li key={idx} className="flex items-start">
+                        <CheckCircle2 className="w-5 h-5 text-green-500 mr-2 shrink-0 mt-0.5" />
+                        <div>
+                          <span className="font-semibold text-gray-900">{el.title}</span>
+                          <p className="text-sm text-gray-600 mt-1">{el.desc}</p>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                {/* Tips */}
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow">
+                  <h3 className="text-xl font-bold mb-4 flex items-center text-indigo-700">
+                    <AlignLeft className="w-5 h-5 mr-2" /> 快速上手六大訣竅
+                  </h3>
+                  <ul className="space-y-3">
+                    {teachingData.tips.map((tip, idx) => (
+                      <li key={idx} className="text-sm">
+                        <span className="font-semibold text-gray-900 block">{tip.title}</span>
+                        <span className="text-gray-600">{tip.desc}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                {/* Level Up */}
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow">
+                  <h3 className="text-xl font-bold mb-4 flex items-center text-purple-700">
+                    <Terminal className="w-5 h-5 mr-2" /> 進階升級技巧
+                  </h3>
+                  <div className="grid grid-cols-1 gap-4">
+                    {teachingData.levelUp.map((lvl, idx) => (
+                      <div key={idx} className="bg-gray-50 p-3 rounded-lg border border-gray-100">
+                        <span className="font-semibold text-gray-800 text-sm">{lvl.title}</span>
+                        <p className="text-xs text-gray-600 mt-1">{lvl.desc}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            {/* Section 2: Scenarios */}
+            <section>
+              <div className="flex items-center justify-center mb-8">
+                <Layers className="w-8 h-8 text-blue-600 mr-3" />
+                <h2 className="text-3xl font-bold text-gray-900">職能情境圖卡庫 (Use Cases)</h2>
+              </div>
+
+              {/* Filter Tabs */}
+              <div className="flex flex-wrap justify-center gap-2 mb-10">
+                {roles.map(role => (
+                  <button
+                    key={role}
+                    onClick={() => setActiveRole(role)}
+                    className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                      activeRole === role 
+                        ? 'bg-blue-600 text-white shadow-md' 
+                        : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
+                    }`}
+                  >
+                    {role}
+                  </button>
+                ))}
+              </div>
+
+              {/* Scenario Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                {filteredScenarios.map(scenario => {
+                  const IconComp = scenario.icon;
+                  return (
+                    <div key={scenario.id} className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden flex flex-col hover:shadow-lg transition-all duration-300">
+                      <div className="p-5 border-b border-gray-100 flex justify-between items-start bg-gray-50/50">
+                        <div>
+                          <span className="inline-block px-3 py-1 bg-blue-100 text-blue-800 text-xs font-semibold rounded-full mb-3">
+                            {scenario.role}
+                          </span>
+                          <h3 className="text-lg font-bold text-gray-900 leading-tight">
+                            {scenario.useCase}
+                          </h3>
+                        </div>
+                        <div className="flex flex-col items-center bg-white p-2 rounded-lg shadow-sm border border-gray-100 shrink-0 ml-3">
+                          <IconComp className="w-6 h-6 text-gray-600 mb-1" />
+                          <span className="text-[10px] text-gray-500 font-medium text-center w-16 leading-tight">{scenario.tool}</span>
+                        </div>
+                      </div>
+                      
+                      <div className="p-5 flex-grow flex flex-col relative">
+                        <p className="text-sm text-gray-700 italic flex-grow mb-4 leading-relaxed font-mono bg-gray-50 p-4 rounded-lg border border-gray-100">
+                          "{scenario.prompt}"
+                        </p>
+                        <button
+                          onClick={() => handleCopy(scenario.prompt, scenario.id)}
+                          className={`w-full py-2.5 px-4 rounded-xl flex items-center justify-center font-medium text-sm transition-all ${
+                            copiedId === scenario.id
+                              ? 'bg-green-100 text-green-700 border border-green-200'
+                              : 'bg-gray-900 text-white hover:bg-gray-800 shadow-sm'
+                          }`}
+                        >
+                          {copiedId === scenario.id ? (
+                            <>
+                              <CheckCircle2 className="w-4 h-4 mr-2" /> 已複製
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="w-4 h-4 mr-2" /> 複製提示詞
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </section>
+
+          </main>
+        </div>
+      );
+
+      return currentView === 'home' ? <HomeView /> : <GuideView />;
+    }
+
+    // --- Render App ---
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
